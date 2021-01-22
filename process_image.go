@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"image"
 	"io"
@@ -70,7 +69,6 @@ func detectText(w io.Writer, f io.Reader, outSet *Set) error {
 	if len(annotations) == 0 {
 		fmt.Fprintln(w, "No text found.")
 	} else {
-		fmt.Fprintln(w, "Text:")
 		for color, team := range teamRects {
 			teamStats := Team{Color: color}
 			for idx, playerRect := range team {
@@ -188,11 +186,11 @@ func ProcessOCRText(text string) int {
 	return processedInt
 }
 
-func RecieveHTTPImage(imageData []byte) ([]byte, error) {
+func RecieveHTTPImage(imageData []byte) (Set, error) {
 	loaded, err := gocv.IMDecode(imageData, gocv.IMReadGrayScale)
 	if err != nil {
 		fmt.Println("Could not decode image", err)
-		return nil, err
+		return Set{}, err
 	}
 	ProcessImage(&loaded)
 	// written := gocv.IMWrite("sample.png", loaded)
@@ -203,7 +201,7 @@ func RecieveHTTPImage(imageData []byte) ([]byte, error) {
 	written, err := gocv.IMEncode(gocv.PNGFileExt, loaded)
 	if err != nil {
 		fmt.Println("Could not encode image", err)
-		return nil, err
+		return Set{}, err
 	}
 
 	imageBuf := bytes.NewBuffer(written)
@@ -211,10 +209,10 @@ func RecieveHTTPImage(imageData []byte) ([]byte, error) {
 	err = detectText(os.Stdout, imageBuf, &set)
 	if err != nil {
 		fmt.Println("Error calling vision API", err)
-		return nil, err
+		return Set{}, err
 	}
-	output, _ := json.MarshalIndent(set, "", "    ")
-	return output, nil
+	// output, _ := json.MarshalIndent(set, "", "    ")
+	return set, nil
 }
 
 // func GetOCRText(image string) string {
