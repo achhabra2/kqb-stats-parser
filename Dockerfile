@@ -4,8 +4,8 @@
 # https://hub.docker.com/_/golang
 FROM golang:1.15-buster as builder
 
-ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig
-ENV LD_LIBRARY_PATH /usr/local/lib64
+ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
+ENV LD_LIBRARY_PATH /usr/local/lib
 ENV CGO_CPPFLAGS -I/usr/local/include
 ENV CGO_CXXFLAGS "--std=c++1z"
 ENV CGO_LDFLAGS "-L/usr/local/lib -lopencv_core -lopencv_face -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect -lopencv_features2d -lopencv_video -lopencv_dnn -lopencv_xfeatures2d -lopencv_plot -lopencv_tracking"
@@ -57,14 +57,12 @@ WORKDIR /app
 COPY go.* ./
 RUN go mod download
 
-RUN cd $GOPATH/src/gocv.io/x/gocv \
-    make install
-
 # Copy local code to the container image.
 COPY . ./
 
 # Build the binary.
 RUN go build -mod=readonly -v -o server
+# RUN go build -tags customenv -mod=readonly -v -o server
 
 # Use the official Debian slim image for a lean production container.
 # https://hub.docker.com/_/debian
@@ -75,20 +73,25 @@ RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /usr/local/lib64 /usr/local/lib64
-COPY --from=builder /usr/local/lib64/pkgconfig /usr/local/lib64/pkgconfig
-COPY --from=builder /usr/local/include/opencv /usr/local/include/opencv
-COPY --from=builder /usr/local/include/opencv2 /usr/local/include/opencv2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+            libgtk2.0-dev \
+#            git build-essential cmake pkg-config unzip \
+#            curl ca-certificates libcurl4-openssl-dev libssl-dev \
+            libavcodec-dev libavformat-dev libswscale-dev libtbb2 libtbb-dev \
+            libjpeg-dev libpng-dev libtiff-dev libdc1394-22-dev && \
+            rm -rf /var/lib/apt/lists/*
 
-ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig
-ENV LD_LIBRARY_PATH /usr/local/lib64
-ENV CGO_CPPFLAGS -I/usr/local/include
-ENV CGO_CXXFLAGS "--std=c++1z"
-ENV CGO_LDFLAGS "-L/usr/local/lib -lopencv_core -lopencv_face -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_objdetect -lopencv_features2d -lopencv_video -lopencv_dnn -lopencv_xfeatures2d -lopencv_plot -lopencv_tracking"
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /usr/local/lib/pkgconfig /usr/local/lib/pkgconfig
+COPY --from=builder /usr/local/include/opencv4 /usr/local/include/opencv4
+
+RUN ldconfig
 
 # Copy the binary to the production image from the builder stage.
 COPY --from=builder /app/server /app/server
+COPY --from=builder /app/static /app/static
 
 # Run the web service on container startup.
-CMD ["/app/server"]
+WORKDIR /app
+
+CMD ["./server"]

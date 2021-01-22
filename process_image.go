@@ -91,7 +91,7 @@ func detectText(w io.Writer, f io.Reader, outSet *Set) error {
 							rectOffset := statRect.Add(offset)
 							// fmt.Printf("For %s, comparing %v to %v", annotation.Description, p, rect)
 							if rectOffset.Overlaps(boundingRect) {
-								fmt.Println("Found Stat", stat, annotation.Description)
+								// log.Println("Found Stat", stat, annotation.Description)
 								switch stat {
 								// case "Name":
 								// 	currentPlayer.Name = annotation.Description
@@ -138,7 +138,7 @@ func ProcessImage(mat *gocv.Mat) {
 	loaded := *mat
 	width := float64(loaded.Cols())
 	height := float64(loaded.Rows())
-	fmt.Printf("Rows %d, Cols %d", height, width)
+	// fmt.Printf("Rows %d, Cols %d", height, width)
 	rescaleWidth := 1920.0 / width
 	rescaleHeight := 1080.0 / height
 	gocv.Resize(loaded, mat, image.Point{}, rescaleWidth, rescaleHeight, gocv.InterpolationLanczos4)

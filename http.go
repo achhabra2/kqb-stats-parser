@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,7 +9,7 @@ import (
 )
 
 func HandleUpload(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("File Upload Endpoint Hit")
+	log.Println("File Upload Endpoint Hit")
 
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
@@ -21,14 +20,12 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	// the Header and the size of the file
 	file, handler, err := r.FormFile("myFile")
 	if err != nil {
-		fmt.Println("Error Retrieving the File")
-		fmt.Println(err)
+		log.Println("Error Retrieving the File", err)
+		http.Error(w, "Couldn't receive your file", 400)
 		return
 	}
 	defer file.Close()
-	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-	fmt.Printf("File Size: %+v\n", handler.Size)
-	fmt.Printf("MIME Header: %+v\n", handler.Header)
+	log.Printf("Uploaded File: %+v\n", handler.Filename)
 	mimeType := handler.Header.Get("Content-Type")
 	if mimeType != "image/png" && mimeType != "image/jpeg" {
 		http.Error(w, "Unsupported file type", 400)
@@ -39,18 +36,20 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	// byte array
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		http.Error(w, "Bad Request", 400)
+		return
 	}
 
 	output, err := RecieveHTTPImage(fileBytes)
 	if err != nil {
 		log.Println("Could not process image, returning http error", err)
 		http.Error(w, "Internal Server Error", 500)
+		return
 	}
 	jsonOutput := string(output)
 
-	parsedTemplate, err := template.ParseFiles("static\\output.html")
+	parsedTemplate, err := template.ParseFiles("./static/output.html")
 	if err != nil {
 		log.Println("Cannot parse template file", err)
 		http.Error(w, "Internal Server Error", 500)
