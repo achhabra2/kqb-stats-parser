@@ -17,20 +17,20 @@ import (
 )
 
 // var subsections = map[string]image.Rectangle{
-// 	"Name":    image.Rect(0, 90, 500, 180),
-// 	"Kills":   image.Rect(0, 500, 250, 610),
-// 	"Berries": image.Rect(250, 500, 500, 610),
-// 	"Deaths":  image.Rect(0, 610, 250, 730),
-// 	"Snail":   image.Rect(250, 610, 500, 730),
-// 	"Queen":   image.Rect(0, 10, 500, 120),
+// 	"Name":    image.Rect(0, 45, 250, 90),
+// 	"Kills":   image.Rect(0, 250, 125, 305),
+// 	"Berries": image.Rect(125, 250, 250, 305),
+// 	"Deaths":  image.Rect(0, 305, 125, 365),
+// 	"Snail":   image.Rect(125, 305, 250, 365),
+// 	"Queen":   image.Rect(0, 5, 250, 60),
 // }
 
 var subsections = map[string]image.Rectangle{
 	"Name":    image.Rect(0, 45, 250, 90),
-	"Kills":   image.Rect(0, 250, 125, 305),
-	"Berries": image.Rect(125, 250, 250, 305),
-	"Deaths":  image.Rect(0, 305, 125, 365),
-	"Snail":   image.Rect(125, 305, 250, 365),
+	"Kills":   image.Rect(40, 250, 145, 305),
+	"Berries": image.Rect(165, 250, 270, 305),
+	"Deaths":  image.Rect(40, 305, 145, 365),
+	"Snail":   image.Rect(165, 305, 270, 365),
 	"Queen":   image.Rect(0, 5, 250, 60),
 }
 
@@ -143,25 +143,29 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	// fmt.Println(matchedRects)
 	// DrawRects(mat, matchedRects, "Queen")
 	// WriteImage(loaded, "test.png")
-	// gocv.EqualizeHist(loaded, mat)
 	//gocv.BilateralFilter(loaded, mat, 5, 20, 20)
 	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
-	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
-	// defer dilateMat.Close()
-	// gocv.Dilate(loaded, mat, dilateMat)
-
-	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdToZero)
-	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdBinary)
+	// gocv.EqualizeHist(loaded, mat)
 	// gocv.AdaptiveThreshold(loaded, mat, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 5, 5)
-	eroderMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
-	defer eroderMat.Close()
-	gocv.Erode(loaded, mat, eroderMat)
+	// window := gocv.NewWindow("Output")
+	// for {
+	// 	window.IMShow(loaded)
+	// 	window.WaitKey(1)
+	// }
+	dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	defer dilateMat.Close()
+	gocv.Dilate(loaded, mat, dilateMat)
+	_ = gocv.Threshold(loaded, mat, 135, 255, gocv.ThresholdToZero)
+	_ = gocv.Threshold(loaded, mat, 135, 255, gocv.ThresholdBinary)
+	// eroderMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// defer eroderMat.Close()
+	// gocv.Erode(loaded, mat, eroderMat)
 	if len(matchedRects) > 0 {
 		log.Printf("Using Origin %v\n", matchedRects[0])
 		return matchedRects[0].Min
 	} else {
 		log.Println("Could not find origin, using default")
-		return image.Point{472, 140}
+		return image.Point{472, 180}
 	}
 }
 
@@ -194,8 +198,12 @@ func SetupPlayerRects(origin image.Point) {
 }
 
 func ProcessOCRText(text string) int {
+	// fmt.Println("Processing Number", text)
 	text = strings.Replace(text, "O", "0", -1)
 	text = strings.Replace(text, "o", "0", -1)
+	text = strings.Replace(text, "l", "1", -1)
+	text = strings.Replace(text, "I", "1", -1)
+
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
 		log.Fatal(err)
