@@ -139,7 +139,7 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	rescaleHeight := 1080.0 / height
 	gocv.Resize(loaded, mat, image.Point{}, rescaleWidth, rescaleHeight, gocv.InterpolationLanczos4)
 
-	matchedRects := MatchImage(loaded, "./internal/queen.png")
+	matchedRects := MatchImage(loaded, "./static/queen.png")
 	// fmt.Println(matchedRects)
 	// DrawRects(mat, matchedRects, "Queen")
 	// WriteImage(loaded, "test.png")
@@ -161,7 +161,7 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 		return matchedRects[0].Min
 	} else {
 		log.Println("Could not find origin, using default")
-		return image.Point{472, 100}
+		return image.Point{472, 140}
 	}
 }
 
