@@ -7,7 +7,6 @@ import (
 )
 
 func main() {
-	SetupPlayerRects()
 	SetupWebServer()
 	// ProcessLocalFile()
 }

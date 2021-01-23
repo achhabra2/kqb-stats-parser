@@ -16,6 +16,13 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
 	r.ParseMultipartForm(10 << 20)
+	// partySize := r.MultipartForm.Value["party"]
+	// partySizeInt, err := strconv.Atoi(partySize[0])
+	// if err != nil {
+	// 	http.Error(w, "Bad Request, unsupport party size, please enter 1-4", 400)
+	// 	return
+	// }
+
 	fhs := r.MultipartForm.File["images"]
 	var finalOutput []Set
 	for _, fh := range fhs {

@@ -34,8 +34,6 @@ var subsections = map[string]image.Rectangle{
 	"Queen":   image.Rect(0, 5, 250, 60),
 }
 
-var queenSubsection = image.Rect(0, 20, 500, 120)
-
 var blueRects, goldRects []image.Rectangle
 
 // detectText gets text from the Vision API for an image at the given file path.
@@ -132,7 +130,7 @@ func IsInBox(rect image.Rectangle, p image.Point) bool {
 	return false
 }
 
-func ProcessImage(mat *gocv.Mat) {
+func ProcessImage(mat *gocv.Mat) image.Point {
 	loaded := *mat
 	width := float64(loaded.Cols())
 	height := float64(loaded.Rows())
@@ -140,29 +138,56 @@ func ProcessImage(mat *gocv.Mat) {
 	rescaleWidth := 1920.0 / width
 	rescaleHeight := 1080.0 / height
 	gocv.Resize(loaded, mat, image.Point{}, rescaleWidth, rescaleHeight, gocv.InterpolationLanczos4)
-	// gocv.EqualizeHist(loaded, mat)
-	eroderMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{2, 2})
 
-	gocv.Dilate(loaded, mat, eroderMat)
-	// gocv.Erode(loaded, mat, eroderMat)
-	_ = gocv.Threshold(loaded, mat, 160, 255, gocv.ThresholdBinaryInv)
+	matchedRects := MatchImage(loaded, "./internal/queen.png")
+	// fmt.Println(matchedRects)
+	// DrawRects(mat, matchedRects, "Queen")
+	// WriteImage(loaded, "test.png")
+	// gocv.EqualizeHist(loaded, mat)
+	//gocv.BilateralFilter(loaded, mat, 5, 20, 20)
+	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
+	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// defer dilateMat.Close()
+	// gocv.Dilate(loaded, mat, dilateMat)
+
+	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdToZero)
+	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdBinary)
 	// gocv.AdaptiveThreshold(loaded, mat, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 5, 5)
+	eroderMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	defer eroderMat.Close()
+	gocv.Erode(loaded, mat, eroderMat)
+	if len(matchedRects) > 0 {
+		log.Printf("Using Origin %v\n", matchedRects[0])
+		return matchedRects[0].Min
+	} else {
+		log.Println("Could not find origin, using default")
+		return image.Point{472, 100}
+	}
 }
 
-func SetupPlayerRects() {
+func SetupPlayerRects(origin image.Point) {
 	xDiff := image.Point{325, 0}
 	yDiff := image.Point{0, 375}
-	minStart := image.Point{472, 100}
-	maxStart := image.Point{722, 465}
+	var minStart, maxStart image.Point
+	// if partySize < 3 {
+	// 	minStart = image.Point{472, 140}
+	// 	maxStart = image.Point{722, 505}
+	// } else {
+	// 	minStart = image.Point{472, 100}
+	// 	maxStart = image.Point{722, 465}
+	// }
+
+	minStart = image.Point{origin.X, origin.Y - 44}
+	maxStart = image.Point{minStart.X + 250, minStart.Y + 365}
 	goldMinStart := minStart.Add(yDiff)
 	goldMaxStart := maxStart.Add(yDiff)
-	// blueRects := make([]image.Rectangle, 0)
+	blueRects = make([]image.Rectangle, 0)
 	nums := []int{0, 1, 2, 3}
 	for _, num := range nums {
 		blueRects = append(blueRects, image.Rectangle{minStart.Add(xDiff.Mul(num)), maxStart.Add(xDiff.Mul(num))})
 	}
 
-	// goldRects := make([]image.Rectangle, 0)
+	goldRects = make([]image.Rectangle, 0)
 	for _, num := range nums {
 		goldRects = append(goldRects, image.Rectangle{goldMinStart.Add(xDiff.Mul(num)), goldMaxStart.Add(xDiff.Mul(num))})
 	}
@@ -187,21 +212,26 @@ func ProcessOCRText(text string) int {
 }
 
 func RecieveHTTPImage(imageData []byte) (Set, error) {
-	loaded, err := gocv.IMDecode(imageData, gocv.IMReadGrayScale)
+	loaded, err := gocv.IMDecode(imageData, gocv.IMReadColor)
 	if err != nil {
 		fmt.Println("Could not decode image", err)
 		return Set{}, err
 	}
-	ProcessImage(&loaded)
-	// written := gocv.IMWrite("sample.png", loaded)
-	// if written == true {
-	// 	fmt.Println("Successful Write")
-	// }
+	defer loaded.Close()
+	origin := ProcessImage(&loaded)
+	SetupPlayerRects(origin)
 
 	written, err := gocv.IMEncode(gocv.PNGFileExt, loaded)
 	if err != nil {
 		fmt.Println("Could not encode image", err)
 		return Set{}, err
+	}
+
+	DrawRects(&loaded, blueRects, "blue")
+	DrawRects(&loaded, goldRects, "gold")
+	write := gocv.IMWrite("./internal/step2.png", loaded)
+	if write == true {
+		fmt.Println("Successful Write")
 	}
 
 	imageBuf := bytes.NewBuffer(written)

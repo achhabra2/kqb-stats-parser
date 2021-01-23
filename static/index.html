@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Document</title>
-  </head>
-  <body>
-    <form
-      enctype="multipart/form-data"
-      action="/upload"
-      method="post"
-    >
-      <input type="file" name="images" multiple/>
-      <input type="submit" value="upload" />
-    </form>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Document</title>
+</head>
+
+<body>
+  <form enctype="multipart/form-data" action="/upload" method="post">
+    <!-- <label for="party">Party Size</label>
+    <input type="text" id="party" name="party" /><br> -->
+    <label for="images">Screenshots</label>
+    <input type="file" id="images" name="images" multiple /><br>
+    <input type="submit" value="upload" />
+  </form>
+</body>
+
 </html>
