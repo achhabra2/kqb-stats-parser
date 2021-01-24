@@ -34,10 +34,8 @@ var subsections = map[string]image.Rectangle{
 	"Queen":   image.Rect(0, 5, 250, 60),
 }
 
-var blueRects, goldRects []image.Rectangle
-
 // detectText gets text from the Vision API for an image at the given file path.
-func detectText(w io.Writer, f io.Reader, outSet *Set) error {
+func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectangle, goldRects []image.Rectangle) error {
 	var teamRects = map[string][]image.Rectangle{
 		"Blue": blueRects,
 		"Gold": goldRects,
@@ -170,7 +168,7 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	}
 }
 
-func SetupPlayerRects(origin image.Point) {
+func SetupPlayerRects(origin image.Point) (blueRects []image.Rectangle, goldRects []image.Rectangle) {
 	xDiff := image.Point{325, 0}
 	yDiff := image.Point{0, 375}
 	var minStart, maxStart image.Point
@@ -196,6 +194,7 @@ func SetupPlayerRects(origin image.Point) {
 	for _, num := range nums {
 		goldRects = append(goldRects, image.Rectangle{goldMinStart.Add(xDiff.Mul(num)), goldMaxStart.Add(xDiff.Mul(num))})
 	}
+	return
 }
 
 func ProcessOCRText(text string) int {
@@ -228,7 +227,7 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 	}
 	defer loaded.Close()
 	origin := ProcessImage(&loaded)
-	SetupPlayerRects(origin)
+	blueRects, goldRects := SetupPlayerRects(origin)
 
 	written, err := gocv.IMEncode(gocv.PNGFileExt, loaded)
 	if err != nil {
@@ -245,12 +244,11 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 
 	imageBuf := bytes.NewBuffer(written)
 	set := Set{}
-	err = detectText(os.Stdout, imageBuf, &set)
+	err = detectText(os.Stdout, imageBuf, &set, blueRects, goldRects)
 	if err != nil {
 		fmt.Println("Error calling vision API", err)
 		return Set{}, err
 	}
-	// output, _ := json.MarshalIndent(set, "", "    ")
 	return set, nil
 }
 

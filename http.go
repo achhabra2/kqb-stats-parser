@@ -39,7 +39,8 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received File: %+v\n", fh.Filename)
 		mimeType := fh.Header.Get("Content-Type")
 		if mimeType != "image/png" && mimeType != "image/jpeg" {
-			http.Error(w, "Unsupported file type", 400)
+			errorStr := fmt.Sprintf("Unsupported file type: %v", mimeType)
+			http.Error(w, errorStr, 400)
 			return
 		}
 		// f is one of the files
@@ -86,7 +87,8 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if r.RequestURI == "/api" {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(200)
 		_, err := w.Write(jsonBytes)
 		if err != nil {
 			log.Println("Could not return parsed json", err)
