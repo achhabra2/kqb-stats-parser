@@ -144,22 +144,23 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	// DrawRects(mat, matchedRects, "Queen")
 	// WriteImage(loaded, "test.png")
 	//gocv.BilateralFilter(loaded, mat, 5, 20, 20)
-	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
-	// gocv.EqualizeHist(loaded, mat)
-	// gocv.AdaptiveThreshold(loaded, mat, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 5, 5)
-	// window := gocv.NewWindow("Output")
-	// for {
-	// 	window.IMShow(loaded)
-	// 	window.WaitKey(1)
-	// }
+	// gocv.EqualizeHist(test, &test)
+	// test := gocv.NewMat()
+	// defer test.Close()
+	// fmt.Println(loaded.Type().String())
+	filter := gocv.NewMatWithSizeFromScalar(gocv.NewScalar(255, 173, 66, 0), 1080, 1920, gocv.MatTypeCV8UC3)
+	gocv.AddWeighted(loaded, 0.8, filter, 0.25, 0, mat)
 	dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
 	defer dilateMat.Close()
 	gocv.Dilate(loaded, mat, dilateMat)
-	_ = gocv.Threshold(loaded, mat, 135, 255, gocv.ThresholdToZero)
-	_ = gocv.Threshold(loaded, mat, 135, 255, gocv.ThresholdBinary)
-	// eroderMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
-	// defer eroderMat.Close()
-	// gocv.Erode(loaded, mat, eroderMat)
+	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdToZero)
+	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
+	_ = gocv.Threshold(loaded, mat, 100, 255, gocv.ThresholdBinaryInv)
+	// window := gocv.NewWindow("Output")
+	// for {
+	// 	window.IMShow(test)
+	// 	window.WaitKey(1)
+	// }
 	if len(matchedRects) > 0 {
 		log.Printf("Using Origin %v\n", matchedRects[0])
 		return matchedRects[0].Min
