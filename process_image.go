@@ -260,16 +260,16 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 		fmt.Println("Could not encode image", err)
 		return Set{}, err
 	}
-	boundryMat := gocv.NewMat()
-	defer boundryMat.Close()
 
-	gocv.CvtColor(processedMat, &boundryMat, gocv.ColorGrayToBGR)
-	DrawRects(&boundryMat, blueRects, "blue")
-	DrawRects(&boundryMat, goldRects, "gold")
-	write := gocv.IMWrite("./internal/step2.png", boundryMat)
-	if write == true {
-		fmt.Println("Successful Write")
-	}
+	// boundryMat := gocv.NewMat()
+	// defer boundryMat.Close()
+	// gocv.CvtColor(processedMat, &boundryMat, gocv.ColorGrayToBGR)
+	// DrawRects(&boundryMat, blueRects, "blue")
+	// DrawRects(&boundryMat, goldRects, "gold")
+	// write := gocv.IMWrite("./internal/step2.png", boundryMat)
+	// if write == true {
+	// 	fmt.Println("Successful Write")
+	// }
 
 	imageBuf := bytes.NewBuffer(written)
 	set := Set{}
