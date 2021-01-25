@@ -52,7 +52,6 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 	// 	return err
 	// }
 	// defer f.Close()
-
 	img, err := vision.NewImageFromReader(f)
 	if err != nil {
 		return err
@@ -101,7 +100,7 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 									if currentPlayer.Name != "" {
 										currentPlayer.Name += " " + annotation.Description
 									} else {
-										currentPlayer.Name = annotation.Description
+										currentPlayer.Name = ProcessOCRName(annotation.Description)
 									}
 								default:
 									break
@@ -128,7 +127,19 @@ func IsInBox(rect image.Rectangle, p image.Point) bool {
 	return false
 }
 
-func ProcessImage(mat *gocv.Mat) image.Point {
+func FindOrigin(mat *gocv.Mat) image.Point {
+	loaded := *mat
+	matchedRects := MatchImage(loaded, "./static/queen.png")
+	if len(matchedRects) > 0 {
+		log.Printf("Using Origin %v\n", matchedRects[0])
+		return matchedRects[0].Min
+	} else {
+		log.Println("Could not find origin, using default")
+		return image.Point{472, 180}
+	}
+}
+
+func ResizeImage(mat *gocv.Mat) {
 	loaded := *mat
 	width := float64(loaded.Cols())
 	height := float64(loaded.Rows())
@@ -136,8 +147,10 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	rescaleWidth := 1920.0 / width
 	rescaleHeight := 1080.0 / height
 	gocv.Resize(loaded, mat, image.Point{}, rescaleWidth, rescaleHeight, gocv.InterpolationLanczos4)
+}
 
-	matchedRects := MatchImage(loaded, "./static/queen.png")
+func ProcessImage(mat *gocv.Mat) {
+	loaded := *mat
 	// fmt.Println(matchedRects)
 	// DrawRects(mat, matchedRects, "Queen")
 	// WriteImage(loaded, "test.png")
@@ -146,26 +159,24 @@ func ProcessImage(mat *gocv.Mat) image.Point {
 	// test := gocv.NewMat()
 	// defer test.Close()
 	// fmt.Println(loaded.Type().String())
-	filter := gocv.NewMatWithSizeFromScalar(gocv.NewScalar(255, 173, 66, 0), 1080, 1920, gocv.MatTypeCV8UC3)
-	gocv.AddWeighted(loaded, 0.8, filter, 0.25, 0, mat)
-	dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
-	defer dilateMat.Close()
-	gocv.Dilate(loaded, mat, dilateMat)
-	_ = gocv.Threshold(loaded, mat, 140, 255, gocv.ThresholdToZero)
+	// filter := gocv.NewMatWithSizeFromScalar(gocv.NewScalar(255, 100, 90, 0), 1080, 1920, gocv.MatTypeCV8UC3)
+	// gocv.AddWeighted(loaded, 0.9, filter, 0.25, 0, mat)
+	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// defer dilateMat.Close()
+	// gocv.Erode(loaded, mat, dilateMat)
+	_ = gocv.Threshold(loaded, mat, 160, 255, gocv.ThresholdToZero)
 	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
-	_ = gocv.Threshold(loaded, mat, 100, 255, gocv.ThresholdBinaryInv)
+	_ = gocv.Threshold(loaded, mat, 110, 255, gocv.ThresholdBinaryInv)
+	//gocv.Dilate(loaded, mat, dilateMat)
+	// erodeMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// defer erodeMat.Close()
+	// gocv.Erode(loaded, mat, erodeMat)
+	// gocv.Dilate(loaded, mat, dilateMat)
 	// window := gocv.NewWindow("Output")
 	// for {
 	// 	window.IMShow(test)
 	// 	window.WaitKey(1)
 	// }
-	if len(matchedRects) > 0 {
-		log.Printf("Using Origin %v\n", matchedRects[0])
-		return matchedRects[0].Min
-	} else {
-		log.Println("Could not find origin, using default")
-		return image.Point{472, 180}
-	}
 }
 
 func SetupPlayerRects(origin image.Point) (blueRects []image.Rectangle, goldRects []image.Rectangle) {
@@ -219,6 +230,15 @@ func ProcessOCRText(text string) int {
 	return processedInt
 }
 
+func ProcessOCRName(text string) string {
+	reg, err := regexp.Compile("[^A-Za-z0-9(){}]+")
+	if err != nil {
+		log.Fatal(err)
+	}
+	processedString := reg.ReplaceAllString(text, "")
+	return processedString
+}
+
 func RecieveHTTPImage(imageData []byte) (Set, error) {
 	loaded, err := gocv.IMDecode(imageData, gocv.IMReadColor)
 	if err != nil {
@@ -226,18 +246,21 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 		return Set{}, err
 	}
 	defer loaded.Close()
-	origin := ProcessImage(&loaded)
+	ResizeImage(&loaded)
+	origin := FindOrigin(&loaded)
 	blueRects, goldRects := SetupPlayerRects(origin)
-
-	written, err := gocv.IMEncode(gocv.PNGFileExt, loaded)
+	processedMat := ImagingProcess(imageData)
+	defer processedMat.Close()
+	ProcessImage(&processedMat)
+	written, err := gocv.IMEncode(gocv.PNGFileExt, processedMat)
 	if err != nil {
 		fmt.Println("Could not encode image", err)
 		return Set{}, err
 	}
 
-	DrawRects(&loaded, blueRects, "blue")
-	DrawRects(&loaded, goldRects, "gold")
-	write := gocv.IMWrite("./internal/step2.png", loaded)
+	// DrawRects(&loaded, blueRects, "blue")
+	// DrawRects(&loaded, goldRects, "gold")
+	write := gocv.IMWrite("./internal/step2.png", processedMat)
 	if write == true {
 		fmt.Println("Successful Write")
 	}

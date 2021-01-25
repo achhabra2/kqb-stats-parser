@@ -8,15 +8,18 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-func ImagingProcess(imageBytes []byte) {
+func ImagingProcess(imageBytes []byte) (mat gocv.Mat) {
 	reader := bytes.NewReader(imageBytes)
 	img, _ := imaging.Decode(reader)
-	dstImage := imaging.AdjustSaturation(img, 15)
-	dstImageFill := imaging.Fill(dstImage, 1920, 1080, imaging.Center, imaging.Lanczos)
-	mat, _ := gocv.ImageToMatRGB(dstImageFill)
-	window := gocv.NewWindow("Output")
-	for {
-		window.IMShow(mat)
-		window.WaitKey(1)
-	}
+	dstImage := imaging.AdjustGamma(img, 1.3)
+	dstImage = imaging.AdjustSaturation(dstImage, 1.5)
+	dstImage = imaging.Sharpen(dstImage, 20)
+	dstImageFill := imaging.Resize(dstImage, 1920, 1080, imaging.Lanczos)
+	mat, _ = gocv.ImageToMatRGB(dstImageFill)
+	// window := gocv.NewWindow("Output")
+	// for {
+	// 	window.IMShow(mat)
+	// 	window.WaitKey(1)
+	// }
+	return
 }
