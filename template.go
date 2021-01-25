@@ -60,7 +60,7 @@ func MatchImage(inputMat gocv.Mat, templateFile string) []image.Rectangle {
 }
 
 func DrawRects(mat *gocv.Mat, rects []image.Rectangle, text string) {
-	rectColor := color.RGBA{255, 255, 255, 1}
+	rectColor := color.RGBA{255, 0, 0, 1}
 	for _, rect := range rects {
 		gocv.Rectangle(mat, rect, rectColor, 3)
 		gocv.PutText(mat, text, rect.Min, gocv.FontHersheySimplex, 0.75, rectColor, 2)

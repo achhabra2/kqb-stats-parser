@@ -25,13 +25,15 @@ import (
 // 	"Queen":   image.Rect(0, 5, 250, 60),
 // }
 
+const scaleFactor = 3
+
 var subsections = map[string]image.Rectangle{
-	"Name":    image.Rect(0, 45, 250, 90),
-	"Kills":   image.Rect(40, 250, 145, 305),
-	"Berries": image.Rect(165, 250, 270, 305),
-	"Deaths":  image.Rect(40, 305, 145, 365),
-	"Snail":   image.Rect(165, 305, 270, 365),
-	"Queen":   image.Rect(0, 5, 250, 60),
+	"Name":    image.Rect(0*scaleFactor, 45*scaleFactor, 250*scaleFactor, 90*scaleFactor),
+	"Kills":   image.Rect(40*scaleFactor, 250*scaleFactor, 145*scaleFactor, 305*scaleFactor),
+	"Berries": image.Rect(165*scaleFactor, 250*scaleFactor, 270*scaleFactor, 305*scaleFactor),
+	"Deaths":  image.Rect(40*scaleFactor, 305*scaleFactor, 145*scaleFactor, 365*scaleFactor),
+	"Snail":   image.Rect(165*scaleFactor, 305*scaleFactor, 270*scaleFactor, 365*scaleFactor),
+	"Queen":   image.Rect(0*scaleFactor, 5*scaleFactor, 250*scaleFactor, 60*scaleFactor),
 }
 
 // detectText gets text from the Vision API for an image at the given file path.
@@ -56,7 +58,7 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 	if err != nil {
 		return err
 	}
-	annotations, err := client.DetectTexts(ctx, img, nil, 70)
+	annotations, err := client.DetectTexts(ctx, img, nil, 120)
 	if err != nil {
 		return err
 	}
@@ -73,7 +75,7 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 				}
 				for _, annotation := range annotations {
 					// fmt.Println(annotation.Description)
-					subStatRect := image.Rect(472, 100, 1720, 844)
+					subStatRect := image.Rect(450*scaleFactor, 90*scaleFactor, 1820*scaleFactor, 1000*scaleFactor)
 					p1 := image.Point{int(annotation.BoundingPoly.Vertices[0].X), int(annotation.BoundingPoly.Vertices[0].Y)}
 					p2 := image.Point{int(annotation.BoundingPoly.Vertices[2].X), int(annotation.BoundingPoly.Vertices[2].Y)}
 					boundingRect := image.Rectangle{p1, p2}
@@ -161,14 +163,14 @@ func ProcessImage(mat *gocv.Mat) {
 	// fmt.Println(loaded.Type().String())
 	// filter := gocv.NewMatWithSizeFromScalar(gocv.NewScalar(255, 100, 90, 0), 1080, 1920, gocv.MatTypeCV8UC3)
 	// gocv.AddWeighted(loaded, 0.9, filter, 0.25, 0, mat)
-	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{2, 2})
 	// defer dilateMat.Close()
 	// gocv.Erode(loaded, mat, dilateMat)
-	_ = gocv.Threshold(loaded, mat, 160, 255, gocv.ThresholdToZero)
+	_ = gocv.Threshold(loaded, mat, 180, 255, gocv.ThresholdToZero)
 	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
 	_ = gocv.Threshold(loaded, mat, 110, 255, gocv.ThresholdBinaryInv)
 	//gocv.Dilate(loaded, mat, dilateMat)
-	// erodeMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
+	// erodeMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{2, 1})
 	// defer erodeMat.Close()
 	// gocv.Erode(loaded, mat, erodeMat)
 	// gocv.Dilate(loaded, mat, dilateMat)
@@ -180,8 +182,8 @@ func ProcessImage(mat *gocv.Mat) {
 }
 
 func SetupPlayerRects(origin image.Point) (blueRects []image.Rectangle, goldRects []image.Rectangle) {
-	xDiff := image.Point{325, 0}
-	yDiff := image.Point{0, 375}
+	xDiff := image.Point{325, 0}.Mul(scaleFactor)
+	yDiff := image.Point{0, 375}.Mul(scaleFactor)
 	var minStart, maxStart image.Point
 	// if partySize < 3 {
 	// 	minStart = image.Point{472, 140}
@@ -191,8 +193,8 @@ func SetupPlayerRects(origin image.Point) (blueRects []image.Rectangle, goldRect
 	// 	maxStart = image.Point{722, 465}
 	// }
 
-	minStart = image.Point{origin.X, origin.Y - 44}
-	maxStart = image.Point{minStart.X + 250, minStart.Y + 365}
+	minStart = image.Point{origin.X, origin.Y - 44*scaleFactor}
+	maxStart = image.Point{minStart.X + 250*scaleFactor, minStart.Y + 365*scaleFactor}
 	goldMinStart := minStart.Add(yDiff)
 	goldMaxStart := maxStart.Add(yDiff)
 	blueRects = make([]image.Rectangle, 0)
@@ -248,6 +250,7 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 	defer loaded.Close()
 	ResizeImage(&loaded)
 	origin := FindOrigin(&loaded)
+	origin = origin.Mul(scaleFactor)
 	blueRects, goldRects := SetupPlayerRects(origin)
 	processedMat := ImagingProcess(imageData)
 	defer processedMat.Close()
@@ -257,10 +260,13 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 		fmt.Println("Could not encode image", err)
 		return Set{}, err
 	}
+	boundryMat := gocv.NewMat()
+	defer boundryMat.Close()
 
-	// DrawRects(&loaded, blueRects, "blue")
-	// DrawRects(&loaded, goldRects, "gold")
-	write := gocv.IMWrite("./internal/step2.png", processedMat)
+	gocv.CvtColor(processedMat, &boundryMat, gocv.ColorGrayToBGR)
+	DrawRects(&boundryMat, blueRects, "blue")
+	DrawRects(&boundryMat, goldRects, "gold")
+	write := gocv.IMWrite("./internal/step2.png", boundryMat)
 	if write == true {
 		fmt.Println("Successful Write")
 	}
