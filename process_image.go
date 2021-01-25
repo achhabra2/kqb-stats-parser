@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,19 +26,27 @@ import (
 // 	"Queen":   image.Rect(0, 5, 250, 60),
 // }
 
-const scaleFactor = 3
+const scaleFactor = 2
 
 var subsections = map[string]image.Rectangle{
 	"Name":    image.Rect(0*scaleFactor, 45*scaleFactor, 250*scaleFactor, 90*scaleFactor),
-	"Kills":   image.Rect(40*scaleFactor, 250*scaleFactor, 145*scaleFactor, 305*scaleFactor),
-	"Berries": image.Rect(165*scaleFactor, 250*scaleFactor, 270*scaleFactor, 305*scaleFactor),
-	"Deaths":  image.Rect(40*scaleFactor, 305*scaleFactor, 145*scaleFactor, 365*scaleFactor),
-	"Snail":   image.Rect(165*scaleFactor, 305*scaleFactor, 270*scaleFactor, 365*scaleFactor),
+	"Kills":   image.Rect(40*scaleFactor, 250*scaleFactor, 125*scaleFactor, 305*scaleFactor),
+	"Berries": image.Rect(165*scaleFactor, 250*scaleFactor, 250*scaleFactor, 305*scaleFactor),
+	"Deaths":  image.Rect(40*scaleFactor, 305*scaleFactor, 125*scaleFactor, 365*scaleFactor),
+	"Snail":   image.Rect(165*scaleFactor, 305*scaleFactor, 250*scaleFactor, 365*scaleFactor),
 	"Queen":   image.Rect(0*scaleFactor, 5*scaleFactor, 250*scaleFactor, 60*scaleFactor),
 }
 
+var mapTemplates map[string]string = map[string]string{
+	"blue-1": "./templates/blue-1.png",
+	"blue-3": "./templates/blue-3.png",
+	"gold-1": "./templates/gold-1.png",
+	"gold-3": "./templates/gold-3.png",
+}
+
 // detectText gets text from the Vision API for an image at the given file path.
-func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectangle, goldRects []image.Rectangle) error {
+func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectangle, goldRects []image.Rectangle, mat *gocv.Mat) error {
+
 	var teamRects = map[string][]image.Rectangle{
 		"Blue": blueRects,
 		"Gold": goldRects,
@@ -66,8 +75,8 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 	if len(annotations) == 0 {
 		fmt.Fprintln(w, "No text found.")
 	} else {
-		for color, team := range teamRects {
-			teamStats := Team{Color: color}
+		for teamColor, team := range teamRects {
+			teamStats := Team{Color: teamColor}
 			for idx, playerRect := range team {
 				currentPlayer := Player{}
 				if idx == 0 {
@@ -75,42 +84,51 @@ func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectang
 				}
 				for _, annotation := range annotations {
 					// fmt.Println(annotation.Description)
-					subStatRect := image.Rect(450*scaleFactor, 90*scaleFactor, 1820*scaleFactor, 1000*scaleFactor)
 					p1 := image.Point{int(annotation.BoundingPoly.Vertices[0].X), int(annotation.BoundingPoly.Vertices[0].Y)}
 					p2 := image.Point{int(annotation.BoundingPoly.Vertices[2].X), int(annotation.BoundingPoly.Vertices[2].Y)}
 					boundingRect := image.Rectangle{p1, p2}
-					if IsInBox(subStatRect, p1) {
-						// fmt.Printf("Annotation: %s, Rect: %v\n", annotation.Description, boundingRect)
-						for stat, statRect := range subsections {
-							offset := image.Point{playerRect.Min.X, playerRect.Min.Y}
-							rectOffset := statRect.Add(offset)
-							// fmt.Printf("For %s, comparing %v to %v", annotation.Description, p, rect)
-							if rectOffset.Overlaps(boundingRect) {
-								// log.Println("Found Stat", stat, annotation.Description)
-								switch stat {
-								// case "Name":
-								// 	currentPlayer.Name = annotation.Description
-								case "Kills":
-									currentPlayer.Kills = ProcessOCRText(annotation.Description)
-								case "Berries":
-									currentPlayer.Berries = ProcessOCRText(annotation.Description)
-								case "Deaths":
-									currentPlayer.Deaths = ProcessOCRText(annotation.Description)
-								case "Snail":
-									currentPlayer.Snail = ProcessOCRText(annotation.Description)
-								case "Queen":
+					// rectColor := color.RGBA{0, 255, 0, 1}
+					// gocv.Rectangle(mat, boundingRect, rectColor, 4)
+					// gocv.PutText(mat, annotation.Description, boundingRect.Min, gocv.FontHersheySimplex, 0.75, rectColor, 2)
+					// fmt.Printf("Annotation: %s, Rect: %v\n", annotation.Description, boundingRect)
+					for stat, statRect := range subsections {
+						offset := image.Point{playerRect.Min.X, playerRect.Min.Y}
+						rectOffset := statRect.Add(offset)
+						// fmt.Printf("For %s, comparing %v to %v", annotation.Description, p, rect)
+						if rectOffset.Overlaps(boundingRect) && len(annotation.Description) < 30 {
+							// log.Println("Found Stat", stat, annotation.Description)
+							switch stat {
+							case "Name":
+								if currentPlayer.Queen == 0 {
 									if currentPlayer.Name != "" {
 										currentPlayer.Name += " " + annotation.Description
 									} else {
 										currentPlayer.Name = ProcessOCRName(annotation.Description)
 									}
-								default:
-									break
 								}
+							case "Kills":
+								currentPlayer.Kills = ProcessOCRText(annotation.Description)
+							case "Berries":
+								currentPlayer.Berries = ProcessOCRText(annotation.Description)
+							case "Deaths":
+								currentPlayer.Deaths = ProcessOCRText(annotation.Description)
+							case "Snail":
+								currentPlayer.Snail = ProcessOCRText(annotation.Description)
+							case "Queen":
+								if currentPlayer.Queen == 1 {
+									if currentPlayer.Name != "" {
+										currentPlayer.Name += " " + annotation.Description
+									} else {
+										currentPlayer.Name = ProcessOCRName(annotation.Description)
+									}
+								}
+							default:
+								break
 							}
 						}
 					}
 				}
+				FindMissingDigits(mat, &currentPlayer, playerRect)
 				teamStats.Players = append(teamStats.Players, currentPlayer)
 			}
 			outSet.Teams = append(outSet.Teams, teamStats)
@@ -131,7 +149,7 @@ func IsInBox(rect image.Rectangle, p image.Point) bool {
 
 func FindOrigin(mat *gocv.Mat) image.Point {
 	loaded := *mat
-	matchedRects := MatchImage(loaded, "./static/queen.png")
+	matchedRects := MatchImage(loaded, "./static/queen.png", 0.50)
 	if len(matchedRects) > 0 {
 		log.Printf("Using Origin %v\n", matchedRects[0])
 		return matchedRects[0].Min
@@ -163,14 +181,14 @@ func ProcessImage(mat *gocv.Mat) {
 	// fmt.Println(loaded.Type().String())
 	// filter := gocv.NewMatWithSizeFromScalar(gocv.NewScalar(255, 100, 90, 0), 1080, 1920, gocv.MatTypeCV8UC3)
 	// gocv.AddWeighted(loaded, 0.9, filter, 0.25, 0, mat)
-	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{2, 2})
+	// dilateMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
 	// defer dilateMat.Close()
-	// gocv.Erode(loaded, mat, dilateMat)
-	_ = gocv.Threshold(loaded, mat, 180, 255, gocv.ThresholdToZero)
+	// gocv.Dilate(loaded, mat, dilateMat)
+	_ = gocv.Threshold(loaded, mat, 155, 255, gocv.ThresholdToZero)
 	gocv.CvtColor(loaded, mat, gocv.ColorBGRToGray)
-	_ = gocv.Threshold(loaded, mat, 110, 255, gocv.ThresholdBinaryInv)
+	_ = gocv.Threshold(loaded, mat, 100, 255, gocv.ThresholdBinaryInv)
 	//gocv.Dilate(loaded, mat, dilateMat)
-	// erodeMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{2, 1})
+	// erodeMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, 1})
 	// defer erodeMat.Close()
 	// gocv.Erode(loaded, mat, erodeMat)
 	// gocv.Dilate(loaded, mat, dilateMat)
@@ -185,15 +203,8 @@ func SetupPlayerRects(origin image.Point) (blueRects []image.Rectangle, goldRect
 	xDiff := image.Point{325, 0}.Mul(scaleFactor)
 	yDiff := image.Point{0, 375}.Mul(scaleFactor)
 	var minStart, maxStart image.Point
-	// if partySize < 3 {
-	// 	minStart = image.Point{472, 140}
-	// 	maxStart = image.Point{722, 505}
-	// } else {
-	// 	minStart = image.Point{472, 100}
-	// 	maxStart = image.Point{722, 465}
-	// }
 
-	minStart = image.Point{origin.X, origin.Y - 44*scaleFactor}
+	minStart = image.Point{0, 0}
 	maxStart = image.Point{minStart.X + 250*scaleFactor, minStart.Y + 365*scaleFactor}
 	goldMinStart := minStart.Add(yDiff)
 	goldMaxStart := maxStart.Add(yDiff)
@@ -227,7 +238,8 @@ func ProcessOCRText(text string) int {
 	}
 	processedInt, err := strconv.Atoi(processedString)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		processedInt = 0
 	}
 	return processedInt
 }
@@ -250,54 +262,127 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 	defer loaded.Close()
 	ResizeImage(&loaded)
 	origin := FindOrigin(&loaded)
+	origin.Y -= 44
 	origin = origin.Mul(scaleFactor)
 	blueRects, goldRects := SetupPlayerRects(origin)
 	processedMat := ImagingProcess(imageData)
 	defer processedMat.Close()
 	ProcessImage(&processedMat)
-	written, err := gocv.IMEncode(gocv.PNGFileExt, processedMat)
+	rectMaxBounds := image.Point{origin.X + 1266*scaleFactor, origin.Y + 765*scaleFactor}
+	croppedRect := image.Rectangle{origin, rectMaxBounds}
+	croppedMat := processedMat.Region(croppedRect)
+	defer croppedMat.Close()
+
+	gocv.CvtColor(croppedMat, &croppedMat, gocv.ColorGrayToBGR)
+	DrawRects(&croppedMat, blueRects, "b")
+	DrawRects(&croppedMat, goldRects, "g")
+	// DrawStatRects(&boundryMat, blueRects)
+	// DrawStatRects(&boundryMat, goldRects)
+
+	written, err := gocv.IMEncode(gocv.PNGFileExt, croppedMat)
 	if err != nil {
 		fmt.Println("Could not encode image", err)
 		return Set{}, err
 	}
-
-	// boundryMat := gocv.NewMat()
-	// defer boundryMat.Close()
-	// gocv.CvtColor(processedMat, &boundryMat, gocv.ColorGrayToBGR)
-	// DrawRects(&boundryMat, blueRects, "blue")
-	// DrawRects(&boundryMat, goldRects, "gold")
-	// write := gocv.IMWrite("./internal/step2.png", boundryMat)
-	// if write == true {
-	// 	fmt.Println("Successful Write")
-	// }
-
 	imageBuf := bytes.NewBuffer(written)
 	set := Set{}
-	err = detectText(os.Stdout, imageBuf, &set, blueRects, goldRects)
+	err = detectText(os.Stdout, imageBuf, &set, blueRects, goldRects, &croppedMat)
 	if err != nil {
 		fmt.Println("Error calling vision API", err)
 		return Set{}, err
 	}
+
+	// write := gocv.IMWrite("./internal/step2.png", croppedMat)
+	// if write == true {
+	// 	fmt.Println("Successful Write")
+	// }
+
 	return set, nil
 }
 
-// func GetOCRText(image string) string {
-// 	client := gosseract.NewClient()
-// 	client.SetWhitelist("01234567890")
-// 	err := client.SetPageSegMode(gosseract.PSM_AUTO_OSD)
-// 	if err != nil {
-// 		fmt.Println("Received Error", err)
-// 	}
-// 	defer client.Close()
-// 	err = client.SetImage(image)
-// 	if err != nil {
-// 		fmt.Println("Received Error", err)
-// 	}
-// 	text, _ := client.Text()
-// 	if err != nil {
-// 		fmt.Println("Received error", err)
-// 	}
-// 	fmt.Println(text)
-// 	// Hello, World!
-// 	return text
-// }
+func FindMissingDigits(mat *gocv.Mat, player *Player, playerRect image.Rectangle) {
+	v := reflect.ValueOf(*player)
+	typeOfS := v.Type()
+	clone := mat.Clone()
+	defer clone.Close()
+	// gocv.CvtColor(*mat, &clone, gocv.ColorGrayToBGR)
+	var fieldids []int
+	if player.Queen == 1 {
+		fieldids = []int{1, 2}
+	} else {
+		fieldids = []int{1, 2, 3}
+	}
+	for _, i := range fieldids {
+		fieldName := typeOfS.Field(i).Name
+		fieldValue := v.Field(i).Interface()
+		// log.Printf("Field: %s\tValue: %v\n", fieldName, fieldValue)
+		if fieldValue.(int) == 0 || fieldValue.(int) > 100 {
+			if fieldName != "Queen" {
+				log.Println("Found 0 value")
+				statRect := subsections[fieldName]
+				offset := image.Point{playerRect.Min.X, playerRect.Min.Y}
+				rectOffset := statRect.Add(offset)
+				statMat := clone.Region(rectOffset)
+				written, err := gocv.IMEncode(gocv.PNGFileExt, statMat)
+				if err != nil {
+					log.Println("Could not encode image", err)
+					return
+				}
+				imageBuf := bytes.NewBuffer(written)
+				OCROutput, _ := detectDocumentText(os.Stdout, imageBuf)
+				intValue := ProcessOCRText(OCROutput)
+				log.Printf("New value found: %d\n", intValue)
+				reflect.ValueOf(player).Elem().Field(i).SetInt(int64(intValue))
+			}
+		}
+	}
+}
+
+// detectDocumentText gets the full document text from the Vision API for an image at the given file path.
+func detectDocumentText(w io.Writer, f io.Reader) (string, error) {
+	ctx := context.Background()
+
+	client, err := vision.NewImageAnnotatorClient(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	image, err := vision.NewImageFromReader(f)
+	if err != nil {
+		return "", err
+	}
+	annotation, err := client.DetectDocumentText(ctx, image, nil)
+	if err != nil {
+		return "", err
+	}
+
+	if annotation == nil {
+		fmt.Fprintln(w, "No text found.")
+		return "", nil
+	} else {
+		// fmt.Fprintln(w, "Document Text:")
+		// fmt.Fprintf(w, "%q\n", annotation.Text)
+		return annotation.Text, nil
+		// fmt.Fprintln(w, "Pages:")
+		// for _, page := range annotation.Pages {
+		// 	fmt.Fprintf(w, "\tConfidence: %f, Width: %d, Height: %d\n", page.Confidence, page.Width, page.Height)
+		// 	fmt.Fprintln(w, "\tBlocks:")
+		// 	for _, block := range page.Blocks {
+		// 		fmt.Fprintf(w, "\t\tConfidence: %f, Block type: %v\n", block.Confidence, block.BlockType)
+		// 		fmt.Fprintln(w, "\t\tParagraphs:")
+		// 		for _, paragraph := range block.Paragraphs {
+		// 			fmt.Fprintf(w, "\t\t\tConfidence: %f", paragraph.Confidence)
+		// 			fmt.Fprintln(w, "\t\t\tWords:")
+		// 			for _, word := range paragraph.Words {
+		// 				symbols := make([]string, len(word.Symbols))
+		// 				for i, s := range word.Symbols {
+		// 					symbols[i] = s.Text
+		// 				}
+		// 				wordText := strings.Join(symbols, "")
+		// 				fmt.Fprintf(w, "\t\t\t\tConfidence: %f, Symbols: %s\n", word.Confidence, wordText)
+		// 			}
+		// 		}
+		// 	}
+		// }
+	}
+}

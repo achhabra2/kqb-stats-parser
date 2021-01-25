@@ -8,7 +8,7 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func MatchImage(inputMat gocv.Mat, templateFile string) []image.Rectangle {
+func MatchImage(inputMat gocv.Mat, templateFile string, beta float32) []image.Rectangle {
 
 	templateMat := gocv.IMRead(templateFile, gocv.IMReadColor)
 	defer templateMat.Close()
@@ -24,7 +24,7 @@ func MatchImage(inputMat gocv.Mat, templateFile string) []image.Rectangle {
 
 	// minVal, maxVal, _, _ := gocv.MinMaxLoc(outputMat)
 	// fmt.Printf("MinVal: %f, MaxVal: %f\n", minVal, maxVal)
-	gocv.Threshold(outputMat, &threshold, 0.50, 1.0, gocv.ThresholdBinary)
+	gocv.Threshold(outputMat, &threshold, beta, 1.0, gocv.ThresholdBinary)
 
 	// rows = height, cols = width
 	// window := gocv.NewWindow("Output")
@@ -71,5 +71,18 @@ func WriteImage(mat gocv.Mat, filename string) {
 	written := gocv.IMWrite(filename, mat)
 	if written == true {
 		fmt.Println("Successful Write")
+	}
+}
+
+func DrawStatRects(mat *gocv.Mat, rects []image.Rectangle) {
+	rectColor := color.RGBA{0, 0, 255, 1}
+	for _, playerRect := range rects {
+		for stat, statRect := range subsections {
+			if stat != "Name" && stat != "Queen" {
+				offset := image.Point{playerRect.Min.X, playerRect.Min.Y}
+				rectOffset := statRect.Add(offset)
+				gocv.Rectangle(mat, rectOffset, rectColor, 3)
+			}
+		}
 	}
 }
