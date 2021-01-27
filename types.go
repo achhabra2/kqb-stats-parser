@@ -11,6 +11,7 @@ type Player struct {
 
 type Team struct {
 	Color   string   `json:"Color"`
+	MapsWon int      `json:MapsWon`
 	Players []Player `json:"Players"`
 }
 

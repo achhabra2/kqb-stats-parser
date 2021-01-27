@@ -89,6 +89,7 @@ RUN ldconfig
 
 # Copy the binary to the production image from the builder stage.
 COPY --from=builder /app/server /app/server
+COPY --from=builder /app/templates /app/templates
 COPY --from=builder /app/static /app/static
 
 # Run the web service on container startup.

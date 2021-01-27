@@ -37,13 +37,6 @@ var subsections = map[string]image.Rectangle{
 	"Queen":   image.Rect(0*scaleFactor, 5*scaleFactor, 250*scaleFactor, 60*scaleFactor),
 }
 
-var mapTemplates map[string]string = map[string]string{
-	"blue-1": "./templates/blue-1.png",
-	"blue-3": "./templates/blue-3.png",
-	"gold-1": "./templates/gold-1.png",
-	"gold-3": "./templates/gold-3.png",
-}
-
 // detectText gets text from the Vision API for an image at the given file path.
 func detectText(w io.Writer, f io.Reader, outSet *Set, blueRects []image.Rectangle, goldRects []image.Rectangle, mat *gocv.Mat) error {
 
@@ -163,6 +156,7 @@ func ResizeImage(mat *gocv.Mat) {
 	loaded := *mat
 	width := float64(loaded.Cols())
 	height := float64(loaded.Rows())
+	// aspectRatio := width / height
 	// fmt.Printf("Rows %d, Cols %d", height, width)
 	rescaleWidth := 1920.0 / width
 	rescaleHeight := 1080.0 / height
@@ -262,6 +256,10 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 	defer loaded.Close()
 	ResizeImage(&loaded)
 	origin := FindOrigin(&loaded)
+	mapsWonRect := image.Rect(0, 0, 1920, 200)
+	mapsWonMat := loaded.Region(mapsWonRect)
+	defer mapsWonMat.Close()
+	blueMapsWon, goldMapsWon := FindMapsWon(mapsWonMat)
 	origin.Y -= 44
 	origin = origin.Mul(scaleFactor)
 	blueRects, goldRects := SetupPlayerRects(origin)
@@ -292,10 +290,18 @@ func RecieveHTTPImage(imageData []byte) (Set, error) {
 		return Set{}, err
 	}
 
-	// write := gocv.IMWrite("./internal/step2.png", croppedMat)
-	// if write == true {
-	// 	fmt.Println("Successful Write")
-	// }
+	for idx, team := range set.Teams {
+		if team.Color == "Blue" {
+			set.Teams[idx].MapsWon = blueMapsWon
+		} else if team.Color == "Gold" {
+			set.Teams[idx].MapsWon = goldMapsWon
+		}
+	}
+
+	write := gocv.IMWrite("./internal/step2.png", croppedMat)
+	if write == true {
+		fmt.Println("Successful Write")
+	}
 
 	return set, nil
 }
