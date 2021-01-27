@@ -4,3 +4,4 @@ steps:
   - --destination=gcr.io/$PROJECT_ID/kqb-stats-parser
   - --cache=true
   - --cache-ttl=72h
+  timeout: 9000s
